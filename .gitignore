@@ -1,0 +1,32 @@
+*.pyc
+*/__pycache__/*
+
+
+# test file
+*_test.py
+do_*.py
+*_test.ipynb
+*.log
+# output
+crawling_data/
+
+log/*
+#for secu
+.env
+pem/
+key-new-auction.pem
+
+#.vscode
+.vscode/
+
+# virtual enviroment
+.venv/*
+
+# testing jupyter notebook
+
+.ipynb_checkpoints/*
+
+*.docx
+*.pdf
+
+analyst_files/*

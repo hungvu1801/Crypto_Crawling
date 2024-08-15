@@ -1,0 +1,16 @@
+pandas
+beautifulsoup4
+numpy
+python-dotenv
+selenium
+pymysql
+sqlalchemy
+sshtunnel
+requests
+openpyxl
+jupyter
+boto3
+webdriver_manager
+brotli
+matplotlib
+seaborn
