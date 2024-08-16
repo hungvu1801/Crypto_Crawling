@@ -123,29 +123,31 @@ def data_merge(today) -> None:
             index=None)
         
 @decorator_catch_exception
-def data_merge_new(today) -> None:
+def data_merge_new(today) -> int:
     '''This function find all .csv files and merge into one file'''
     companies = ['OKX', 'Binance', 'Bitget', 'Bybit']
     df_list = list()
     for company in companies:
         try:
             df = pd.read_csv(
-                f"crawling_data/{today}/{company}.csv", 
+                f"{DATA_DIR}/{today}/{company}.csv", 
                 header=0, 
                 index_col=None, 
                 dtype={'user_id': str})
             
+            if company == 'OKX':
+                df["ROI"] = df["ROI"] * 100
+            if company == 'Bitget' or company == 'Bybit':
+                df["ROI"] = df['ROI'].str.replace('[\%,]', '', regex=True).astype(float)
+                df['PNL'] = df['PNL'].str.replace('[\$,]', '', regex=True).astype(float)
+            df_list.append(df)
         except Exception:
-            return
-        if company == 'OKX':
-            df["ROI"] = df["ROI"] * 100
-        if company == 'Bitget' or company == 'Bybit':
-            df["ROI"] = df['ROI'].str.replace('[\%,]', '', regex=True).astype(float)
-            df['PNL'] = df['PNL'].str.replace('[\$,]', '', regex=True).astype(float)
-        df_list.append(df)
+            return 0
     df = pd.concat(df_list, axis=0, ignore_index=True)
+
     df.to_csv(f"{DATA_DIR}/{today}/data_merge.csv",
-        index=None)   
+        index=None)
+    return 1
 
 @decorator_catch_exception
 def remove_files() -> None:

@@ -30,3 +30,5 @@ key-new-auction.pem
 *.pdf
 
 analyst_files/*
+
+reports/*

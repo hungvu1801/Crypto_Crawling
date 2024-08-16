@@ -10,6 +10,7 @@ from src.crypto_exchanges.Bybit.main import crawler as bybit
 from src.crypto_exchanges.Bitget.main import crawler as bitget
 from src.crypto_exchanges.OKX.main import crawler as okx
 from src.utility.helper import create_directories, remove_files, data_merge, pre_process_result, data_merge_new, wrapper_control_VPN
+from src.analysts.export_chart import export_charts
 from src.utility.saveFile import createDirectory
 import logging
 
@@ -40,9 +41,12 @@ def crawler_main() -> None:
     
     wrapper_control_VPN(crypto_exchange_VPN, True)
 
-    data_merge_new(today)
+    is_merge_success = data_merge_new(today)
     # # Merge all src result
+    if not is_merge_success:
+        return
 
+    export_charts(today)
     # # Process file merged, filter False value
     # # Print scanning report to console
     # print_report()
