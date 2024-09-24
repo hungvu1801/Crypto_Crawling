@@ -1,13 +1,10 @@
-import requests
-import json
-import brotli
-import zlib
 import pandas as pd
 from datetime import datetime, timedelta
 
 import matplotlib.pyplot as plt
 import seaborn as sns
 from src.config import DATA_DIR, TRANSACT_PERIOD
+from src.utility.data_processing import process_merge, scientific_to_float
 
 import matplotlib.font_manager as fm
 plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
@@ -18,17 +15,9 @@ plt.rcParams['axes.unicode_minus'] = False
 import warnings
 warnings.filterwarnings("ignore")
 
-def process_merge(df) -> pd.DataFrame:
-    df = df.loc[((df['ROI'] != 0) | (df['PNL'] != 0))]
-    df = df.dropna().reset_index().drop(columns=['index'], axis=1)
-    return df
-
-def scientific_to_float(value):
-    return "{:,.2f}".format(value)
-
 def export_charts(today) -> None:
     df_list = list()
-    for date_delta in range(10):
+    for date_delta in range(100):
         date = (datetime.today() - timedelta(days=date_delta)).strftime('%y%m%d')
         try:
             df = pd.read_csv(f"{DATA_DIR}/{date}/data_merge.csv", header=0)
@@ -39,6 +28,7 @@ def export_charts(today) -> None:
 
     df_merge = pd.concat(df_list, axis=0, ignore_index=True)
     df_filter_no_data = process_merge(df_merge)
+    df_filter_no_data.drop_duplicates(subset=['user_id', 'crypto_exchange', 'transact_date'], inplace=True)
     df_sorted_ROI = df_filter_no_data.loc[df_filter_no_data['transact_date'] == today].sort_values(['crypto_exchange', 'ROI'], ascending=[True, False])
     #####################################################################################################
     df_sorted_ROI.drop_duplicates(inplace=True)
@@ -77,22 +67,34 @@ def export_charts(today) -> None:
     grouped_stats['transact_date'] = pd.to_datetime(grouped_stats['transact_date'], format='%y%m%d')
     grouped_stats['PNL_min'] = grouped_stats['PNL_min'].apply(scientific_to_float)
     grouped_stats['PNL_max'] = grouped_stats['PNL_max'].apply(scientific_to_float)
+    grouped_stats.to_csv(f"reports/{today}_groupstats.csv", index=False)
     # Set up the matplotlib figure
     #####################################################################################################
     # Set up the matplotlib figure
     fig, axes = plt.subplots(1, 2, figsize=(15, 6), sharey=False)
 
     # Plot ROI mean
-    sns.lineplot(ax=axes[0], data=grouped_stats, x='transact_date', y='ROI_mean', hue='crypto_exchange', marker='o')
+    sns.lineplot(
+        ax=axes[0], data=grouped_stats, 
+        x='transact_date', y='ROI_mean', 
+        hue='crypto_exchange', marker='o', 
+        linewidth=0.5, markersize=4)
     axes[0].set_title('ROI Mean Over Time by Exchange')
     axes[0].set_xlabel('Date')
     axes[0].set_ylabel('ROI Mean')
-
+    axes[0].tick_params(axis='x', rotation=45)
+    axes[0].yaxis.grid(True)
     # Plot PNL mean
-    sns.lineplot(ax=axes[1], data=grouped_stats, x='transact_date', y='PNL_mean', hue='crypto_exchange', marker='o')
+    sns.lineplot(
+        ax=axes[1], data=grouped_stats, 
+        x='transact_date', y='PNL_mean', 
+        hue='crypto_exchange', marker='o', 
+        linewidth=0.5, markersize=4)
     axes[1].set_title('PNL Mean Over Time by Exchange')
     axes[1].set_xlabel('Date')
     axes[1].set_ylabel('PNL Mean')
+    axes[1].tick_params(axis='x', rotation=45)
+    axes[1].yaxis.grid(True)
     plt.savefig(f"reports/{today}_roiandpnl.png")
     # plt.tight_layout()
     # plt.show()

@@ -1,12 +1,13 @@
 import copy
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 import logging
 import os
 import pandas as pd
 import re
 import time
-
+import requests
+import json
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
@@ -20,9 +21,9 @@ logger.setLevel(logging.INFO)
 def decorator_catch_exception(func):
     '''This is decorator to catch exception of executing a function'''
     @wraps(func)
-    def wrapper(*args):
+    def wrapper(*args, **kwargs):
         try:
-            result = func(*args)
+            result = func(*args, **kwargs)
             return result
         except Exception as e:
             logger.info(f"{func.__name__} {e}")
@@ -98,56 +99,9 @@ def find_elements_with_retry(driver, xpath):
             print(f'Detail page scrapping Error: {type(e).__name__}')
             attempt += 1
             driver.implicitly_wait(10)
-            print(f'페이지를 새로고침합니다. {attempt}회 시도')
+            print(f'No Element Located. No. of {attempt}')
             driver.get(driver.current_url)
     return elements
-
-@decorator_catch_exception
-def data_merge(today) -> None:
-    '''This function find all .csv files and merge into one file'''
-    auction_datas = list()
-    for file in os.listdir(f"{DATA_DIR}/{today}"):
-        if os.path.splitext(file)[1] == ".csv" and (
-            not re.search('card', file) and not re.search('detail', file) and not re.search('data_merge', file)):
-            auction_datas.append(os.path.join(f"{DATA_DIR}/{today}", file))
-            print(file)
-    
-    if auction_datas:
-        df_list = list()
-        for filename in auction_datas:
-            df = pd.read_csv(filename, index_col=None, header=0)
-            df_list.append(df)
-        df = pd.concat(df_list, axis=0, ignore_index=True)
-        
-        df.to_csv(f"{DATA_DIR}/{today}/data_merge.csv", 
-            index=None)
-        
-@decorator_catch_exception
-def data_merge_new(today) -> int:
-    '''This function find all .csv files and merge into one file'''
-    companies = ['OKX', 'Binance', 'Bitget', 'Bybit']
-    df_list = list()
-    for company in companies:
-        try:
-            df = pd.read_csv(
-                f"{DATA_DIR}/{today}/{company}.csv", 
-                header=0, 
-                index_col=None, 
-                dtype={'user_id': str})
-            
-            if company == 'OKX':
-                df["ROI"] = df["ROI"] * 100
-            if company == 'Bitget' or company == 'Bybit':
-                df["ROI"] = df['ROI'].str.replace('[\%,]', '', regex=True).astype(float)
-                df['PNL'] = df['PNL'].str.replace('[\$,]', '', regex=True).astype(float)
-            df_list.append(df)
-        except Exception:
-            return 0
-    df = pd.concat(df_list, axis=0, ignore_index=True)
-
-    df.to_csv(f"{DATA_DIR}/{today}/data_merge.csv",
-        index=None)
-    return 1
 
 @decorator_catch_exception
 def remove_files() -> None:
@@ -215,40 +169,6 @@ def scroll_page_down(driver, height=None):
     else:
         driver.execute_script(f"window.scrollTo(0, {height});")
 
-def create_directories(today) -> None:
-    # Create a folder to contain src result for each auction
-    createDirectory(f"{DATA_DIR}/{today}")
-    company_list = ["Binance", "Bybit", "OKX", "Bitget"]
-    for company in  company_list:
-        createDirectory(f"{DATA_DIR}/{company}/{today}")
-
-def pre_process_result(today) -> None:
-    df_OKX = pd.read_csv(f"crawling_data/{today}/OKX.csv", header=0)
-    # df_Binance = pd.read_csv(f"crawling_data/{today}/Binance.csv", header=0)
-    df_Bitget = pd.read_csv(f"crawling_data/{today}/Bitget.csv", header=0)
-    df_Bybit = pd.read_csv(f"crawling_data/{today}/Bybit.csv", header=0)
-
-    df_OKX["ROI"] = df_OKX["ROI"] * 100
-    try:
-        df_Bitget["ROI"] = df_Bitget['ROI'].str.replace('%', '').astype(float)
-    except AttributeError:
-        pass 
-    try:
-        df_Bitget['PNL'] = df_Bitget['PNL'].str.replace('[\$,]', '', regex=True).astype(float)
-    except AttributeError:
-        pass
-    try:
-        df_Bybit["ROI"] = df_Bybit['ROI'].str.replace('%', '').astype(float)
-    except AttributeError:
-        pass
-    try:
-        df_Bybit['PNL'] = df_Bybit['PNL'].str.replace('[\$,]', '', regex=True).astype(float)
-    except AttributeError:
-        pass
-    df_OKX.to_csv(f"crawling_data/{today}/OKX.csv", index=None)
-    # df_Binance = pd.read_csv(f"crawling_data/{today}/Binance.csv", index=None)
-    df_Bitget.to_csv(f"crawling_data/{today}/Bitget.csv", index=None)
-    df_Bybit.to_csv(f"crawling_data/{today}/Bybit.csv", index=None)
 
 def control_VPN(status="close") -> None:
     import subprocess
@@ -278,10 +198,17 @@ def run_crawler(func):
         return f"{func.__code__.co_filename} : Crawling Error. {err}" # func.__code__.co_filename returns function directory 
     return f"{func.__code__.co_filename} : Crawling Successfully."
 
-def run_crawler_concurrent(crypto_exchange):
+# def run_crawler_concurrent(crypto_exchange):
+#     import concurrent.futures
+#     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+#         futures = [executor.submit(run_crawler, crypto) for crypto in crypto_exchange]
+#         for future in concurrent.futures.as_completed(futures):
+#             print(future.result())
+
+def run_func_concurrently(func, list_arguments, max_workers=4):
     import concurrent.futures
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        futures = [executor.submit(run_crawler, crypto) for crypto in crypto_exchange]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(func, item) for item in list_arguments]
         for future in concurrent.futures.as_completed(futures):
             print(future.result())
 
@@ -289,13 +216,84 @@ def run_crawler_concurrent(crypto_exchange):
 def wrapper_control_VPN(crypto_exchange, required_VPN=False):
     '''This is decorator to catch exception of executing a function'''
     if not required_VPN:
-        run_crawler_concurrent(crypto_exchange)
+        run_func_concurrently(func=run_crawler, list_arguments=crypto_exchange)
     else:
         try:
             status = control_VPN("open")
             time.sleep(5)
             if status == 0:
-                run_crawler_concurrent(crypto_exchange)
+                run_func_concurrently(func=run_crawler, list_arguments=crypto_exchange)
                 control_VPN()
         except Exception as e:
             raise e
+        
+def my_timer(orig_func):
+    ''' Count the time each function running'''
+    import time
+    @wraps(orig_func) # place @wraps() it before wrapper function
+    def wrapper(*args, **kwargs):
+        t1 = time.time()
+        result = orig_func(*args, **kwargs)
+        t2 = time.time() - t1
+        print(f'{orig_func.__name__} ran in {t2} seconds.')
+        return result
+    return wrapper
+
+def request_post_wrapper(*args):
+    url_api_get_history = args[0]
+    payload = args[1]
+    headers = args[2]
+    attempt_count = 0
+    connection_error = 0
+    while True:
+        if attempt_count > 5:
+            if connection_error > 2:
+                logger.info(f">>>>>>>>>>> CHECK THIS PAYLOAD <<<<<<<<<<<\n\t\t{payload}")
+            return None
+        try:
+            response = requests.post(url_api_get_history, data=json.dumps(payload), headers=headers, timeout=5)
+            time.sleep(2)
+            logger.info(f"status : {response.status_code}")
+            if response.status_code != 200:
+                attempt_count += 1
+                time.sleep(5 * attempt_count)
+            else:
+                return response
+        except requests.exceptions.ConnectionError:
+            attempt_count += 1
+            connection_error += 1
+            logger.info(f"Connection error payload : {payload}")
+            time.sleep(5 * attempt_count)
+
+def request_get_wrapper(*args):
+    url_api_get_history = args[0]
+    headers = args[1]
+
+    attempt_count = 0
+    connection_error = 0
+    while True:
+        if attempt_count > 5:
+            if connection_error > 2:
+                logger.info(f">>>>>>>>>>> CHECK THIS URL <<<<<<<<<<<\n\t\t{url_api_get_history}")
+            return None
+        try:
+            response = requests.get(url_api_get_history, headers=headers, timeout=5)
+            logger.info(f"request {url_api_get_history}")
+            time.sleep(2)
+            logger.info(f"status : {response.status_code}")
+            if response.status_code != 200:
+                attempt_count += 1
+                time.sleep(5 * attempt_count)
+            else:
+                return response
+        except requests.exceptions.ConnectionError:
+            attempt_count += 1
+            connection_error += 1
+            logger.info(f"Connection error url : {url_api_get_history}")
+            time.sleep(5 * attempt_count)
+
+def get_timestamp_now(milisec=False):
+    if not milisec:
+        return round(datetime.timestamp(datetime.now()))
+    else:
+        return round(datetime.timestamp(datetime.now())*1000)

@@ -15,8 +15,12 @@ from src.utility.helper import scroll_page_down
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+today = datetime.now().strftime("%y%m%d")
+# handler = logging.FileHandler(f'log/{today}/bitgetdetail.log')
+# logger.addHandler(handler)
+# logger.setLevel(logging.INFO)
 
-today = datetime.now().strftime('%y%m%d')
+
 company = file_name = COMPANY
 transact_period = TRANSACT_PERIOD[0]
 
@@ -29,7 +33,9 @@ def Card(driver) -> pd.DataFrame:
 
     driver.find_element(By.XPATH, "//div[@class='bit-dropdown']").click()
     time.sleep(1)
-    transact_elems = driver.find_elements(By.XPATH, "//ul[@id='bit-id-100-490']/li")
+    # transact_elems = driver.find_elements(By.XPATH, "//ul[@id='bit-id-100-12']/li")
+    transact_elems = driver.find_elements(By.XPATH, "//ul[@class='bit-dropdown-menu']/li")
+    
     if transact_elems:
         transact_elems[0].click()
         time.sleep(2)

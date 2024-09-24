@@ -1,7 +1,11 @@
-
 from datetime import datetime
+import logging
+
 # from src.crypto_exchanges.Binance.main import crawler 
-from src.crypto_exchanges.OKX.main import crawler
+from src.analysts.export_chart import export_charts
+from src.data_push.load_data import main as load_data_to_DB
+
+# from src.crypto_exchanges.OKX.main import crawler
 # from src.crypto_exchanges.Bitget.main import crawler
 # from src.crypto_exchanges.Bybit.main import crawler
 
@@ -9,10 +13,10 @@ from src.crypto_exchanges.Binance.main import crawler as binance
 from src.crypto_exchanges.Bybit.main import crawler as bybit
 from src.crypto_exchanges.Bitget.main import crawler as bitget
 from src.crypto_exchanges.OKX.main import crawler as okx
-from src.utility.helper import create_directories, remove_files, data_merge, pre_process_result, data_merge_new, wrapper_control_VPN
-from src.analysts.export_chart import export_charts
-from src.utility.saveFile import createDirectory
-import logging
+from src.utility.data_processing import data_merge_new
+from src.utility.helper import wrapper_control_VPN
+from src.utility.saveFile import createDirectory, create_directories
+
 
 today = datetime.now().strftime("%y%m%d")
 createDirectory("log")
@@ -27,31 +31,34 @@ crypto_exchange_noVPN = [
     binance, 
     bitget,
     okx,
+    bybit
     ]
 
-crypto_exchange_VPN = [
-    bybit, 
-    ]
+# crypto_exchange_VPN = [
+#     bybit, 
+#     ]
 
-def crawler_main() -> None:
+def crawler_main_overview() -> None:
+    print("crawling overview")
+    # today = '240829'
+
     # Create a folder to contain src result for each auction
     create_directories(today)
     # Run src
     wrapper_control_VPN(crypto_exchange_noVPN)
     
-    wrapper_control_VPN(crypto_exchange_VPN, True)
-
     is_merge_success = data_merge_new(today)
+    # is_merge_success = data_merge_new(today="240826", specific=True, company_list=["Bitget"])
     # # Merge all src result
     if not is_merge_success:
         return
 
     export_charts(today)
-    # # Process file merged, filter False value
-    # # Print scanning report to console
-    # print_report()
+
+    load_data_to_DB()
+
+
 
 if __name__ == '__main__':
     # input()
-    crawler_main()
-    # crawler()
+    crawler_main_overview()

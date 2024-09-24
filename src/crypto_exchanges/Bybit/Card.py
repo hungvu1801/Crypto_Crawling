@@ -14,7 +14,7 @@ from src.config import RESULT, TRANSACT_PERIOD
 from src.crawling.findElement import find_element_with_retry
 from src.crypto_exchanges.Bybit.config import COMPANY
 from src.defines.urls import url_dic
-from src.utility.helper import scroll_page_down
+from src.utility.helper import scroll_page_down, get_timestamp_now
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -74,7 +74,7 @@ def Card_selem(driver) -> pd.DataFrame:
 def Card_API(driver) -> pd.DataFrame:
     result_main = copy.deepcopy(RESULT)
     result_main['user_id'] = []
-    epoch_time_now = round(datetime.now().timestamp())
+    epoch_time_now = get_timestamp_now()
     start_page = 1
     total_page_count = 0
     while True:
@@ -84,8 +84,7 @@ def Card_API(driver) -> pd.DataFrame:
         driver.get(api_url)
         time.sleep(2)
         content_elem = find_element_with_retry(driver, 'pre')
-        if content_elem:
-            logger.info('content found')
+
         content = content_elem.text
         
         parsed_content = json.loads(content)

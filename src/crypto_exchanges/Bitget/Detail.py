@@ -11,37 +11,25 @@ import zlib
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+from src.data_push.load_data import create_engine_db
+from src.config import DATA_DIR, TRANSACT_PERIOD, USER_AGENTS
+from src.data_pipeline.TransactionDataPipeline import TransactionDataPipeline
+from src.crypto_exchanges.Bitget.config import COMPANY, url, headers, url_api_get_history, headers_position
+from src.utility.helper import request_post_wrapper
+import copy
 
-from src.config import DATA_DIR, TRANSACT_PERIOD
-from src.crypto_exchanges.Bitget.config import COMPANY
-
+import random
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+today = datetime.now().strftime("%y%m%d")
+# handler = logging.FileHandler(f'log/{today}/bitgetdetail.log')
+# logger.addHandler(handler)
+# logger.setLevel(logging.INFO)
 
-today = datetime.now().strftime('%y%m%d')
 company = file_name = COMPANY
 transact_period = TRANSACT_PERIOD[0]
-
-def Detail_API(df) -> pd.DataFrame:
     
-    url = "https://www.bitget.com/v1/trigger/trace/public/cycleData"
-    headers = {
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/png,image/svg+xml,*/*;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br, zstd",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Connection": "keep-alive",
-        "Content-Type": "application/json;charset=UTF-8",
-        "DNT": "1",
-        "Host": "www.bitget.com",
-        "Origin": "null",
-        "Priority": "\"u=0, i\"",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-GPC": "1",
-        "TE": "trailers",
-        "Upgrade-Insecure-Requests": "1",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0",
-    }
+def Detail_API(df) -> pd.DataFrame:
 
     for url in df['url']:
         roi = pnl = ""
@@ -107,3 +95,85 @@ def Detail_selem(driver, df) -> pd.DataFrame:
             continue
     # df.to_csv(f"{DATA_DIR}/{today}/{file_name}_detail.csv", index=None)
     return df
+
+def Detail_API_get_position(trader_id, page_no=1) -> int:
+
+
+    engine = create_engine_db()
+    logger.info(f"Start {trader_id}")
+    transaction_data_pipeline = TransactionDataPipeline(
+        table_name="position_history_Bitget", 
+        exchange="Bitget", 
+        engine=engine)
+    is_data_duplicated = False
+    try:
+        while True:
+            if is_data_duplicated:
+                break
+            logger.info(f"{trader_id}: page - {page_no}")
+            payload = {"languageType":0, "traderUid":trader_id, "pageNo":page_no, "pageSize":20}
+            logger.info(f"payload : {payload}")
+            user_agent = random.choice(USER_AGENTS)
+            referer = f"https://www.bitget.com/copy-trading/trader/{trader_id}/futures-order"
+            headers = copy.deepcopy(headers_position)
+            headers["User-Agent"] = user_agent
+            headers["Referer"] = referer
+
+            response = request_post_wrapper(url_api_get_history, payload, headers)
+            if not response:
+                break
+            response_content = response.content.decode('utf-8', errors='ignore')
+            data = json.loads(response_content)
+
+            transaction_history = data["data"]["rows"]
+
+            if not transaction_history:
+                break
+
+            for transaction in transaction_history:
+                transaction_data = {
+                    'achieved_profits': transaction['achievedProfits'],
+                    'close_avg_price': transaction['closeAvgPrice'],
+                    'close_deal_count': transaction['closeDealCount'],
+                    'close_fee': transaction['closeFee'],
+                    'close_time': transaction['closeTime'],
+                    'net_profit': transaction['netProfit'],
+                    'open_avg_price': transaction['openAvgPrice'],
+                    'open_deal_count': transaction['openDealCount'],
+                    'open_fee': transaction['openFee'],
+                    'open_margin_count': transaction['openMarginCount'],
+                    'open_time': transaction['openTime'],
+                    'open_level': transaction['openLevel'],
+                    'order_no': transaction['orderNo'],
+                    'margin_mode': transaction['marginMode'],
+                    'position': transaction['position'],
+                    'left_symbol': transaction['leftSymbol'],
+                    'token_id': transaction['tokenId'],
+                    'position_average': transaction['positionAverage'],
+                    'product_code': transaction['productCode'],
+                    'return_rate': transaction['returnRate'],
+                    'user_name': transaction['userName'],
+                    'teacher_id': transaction['teacherId'],
+                    'updated_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                }
+
+                is_data_duplicated = transaction_data_pipeline.add_transaction(transaction_data)
+                logger.info(f"is_data_duplicated : {is_data_duplicated}")
+                # break
+                if is_data_duplicated:
+                    break
+
+            page_no += 1
+        transaction_data_pipeline.close_pipeline()
+        engine.dispose()
+        return 0
+
+    except Exception as e:
+        logger.info(f"error: {e}")
+        transaction_data_pipeline.close_pipeline()
+        engine.dispose()
+        return 1
+
+
+def Detail_API_get_coin() -> pd.DataFrame:
+    return

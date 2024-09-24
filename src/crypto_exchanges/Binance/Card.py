@@ -12,15 +12,20 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import StaleElementReferenceException
 
-from src.config import RESULT, DATA_DIR, TRANSACT_PERIOD
-from src.crypto_exchanges.Binance.config import COMPANY
+from src.config import RESULT, DATA_DIR, TRANSACT_PERIOD, USER_AGENTS
+from src.crypto_exchanges.Binance.config import COMPANY, url_api, headers, payload
 from src.defines.urls import url_dic
 from src.utility.helper import scroll_page_down
+import random
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+today = datetime.now().strftime("%y%m%d")
+# handler = logging.FileHandler(f'log/{today}/binancedetail.log')
+# logger.addHandler(handler)
+# logger.setLevel(logging.INFO)
 
-today = datetime.now().strftime('%y%m%d')
+
 company = file_name = COMPANY
 transact_period = TRANSACT_PERIOD[0]
 
@@ -118,27 +123,10 @@ def Card_API() -> dict:
     result_main = copy.deepcopy(RESULT)
     result_main['user_id'] = []
     start_page = 1
-    url_api = "https://www.binance.com/bapi/futures/v1/friendly/future/copy-trade/home-page/query-list"
-    headers = {
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/png,image/svg+xml,*/*;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br, zstd",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Connection": "keep-alive",
-        "Content-Type": "application/json;charset=UTF-8",
-        "DNT": "1",
-        "Host": "www.binance.com",
-        "Origin": "null",
-        "Priority": "\"u=0, i\"",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "cross-site",
-        "TE": "trailers",
-        "Sec-GPC": "1",
-        "Upgrade-Insecure-Requests": "1",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0",
-    }
     while True:
-        payload = {"pageNumber":int(f"{start_page}"),"pageSize":18,"timeRange":"7D","dataType":"PNL","favoriteOnly":"false","hideFull":"true","nickname":"","order":"DESC","userAsset":0,"portfolioType":"PUBLIC"}
+        payload["pageNumber"] = start_page
+        user_agent = random.choice(USER_AGENTS)
+        headers["User-Agent"] = user_agent
         response = requests.post(url_api, data=json.dumps(payload), headers=headers)
         time.sleep(2)
         # logger.info(f"current page: {start_page}")

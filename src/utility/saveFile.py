@@ -18,7 +18,15 @@ def createDirectory(directory):
         if not os.path.exists(directory):
             os.makedirs(directory)
     except OSError:
-        print("폴더생성에 실패했습니다.")
+        print("Directory not exists.")
+
+def create_directories(today) -> None:
+    from src.config import DATA_DIR
+    # Create a folder to contain src result for each auction
+    createDirectory(f"{DATA_DIR}/{today}")
+    company_list = ["Binance", "Bybit", "OKX", "Bitget"]
+    for company in  company_list:
+        createDirectory(f"{DATA_DIR}/{company}/{today}")
 
 def removeDirectory(directory):
     if os.path.exists(directory):

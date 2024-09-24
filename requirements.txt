@@ -14,3 +14,6 @@ webdriver_manager
 brotli
 matplotlib
 seaborn
+sqlalchemy 
+pymysql
+sqlmodel

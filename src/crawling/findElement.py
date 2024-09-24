@@ -10,14 +10,15 @@ def find_element_with_retry(driver, tag_name):
     element = ''
     while attempt < 3:
         try:
+            time.sleep(1)
             element = WebDriverWait(driver, 10 + attempt*2).until(
                 EC.presence_of_element_located((By.TAG_NAME, tag_name))
             )
             if element: return element
-        except TimeoutException as e:
+        except TimeoutException:
             attempt += 1
             driver.get(driver.current_url)
-            time.sleep(10)
+            time.sleep(5)
             continue
     if attempt == 3:
         raise TimeoutException
